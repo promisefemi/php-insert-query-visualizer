@@ -63,13 +63,16 @@ echo $form;
 
 
 if ($current_table_name) {
-    $get_table_column_query =  "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" . $current_table_name . "' and TABLE_SCHEMA = '" . $database . "'";
+    $get_table_column_query =  "SELECT COLUMN_NAME, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" . $current_table_name . "' and TABLE_SCHEMA = '" . $database . "'";
 
     // echo $get_table_column_query;
 
     $column_query =  $conn->query($get_table_column_query);
     $columns = $column_query->fetch_all();
     $insert_to_parse = '';
+
+
+
 
     if (isset($_POST['insert_query'])) {
         $insert_to_parse = $_POST['insert_query'];
@@ -95,15 +98,15 @@ if ($current_table_name) {
     echo $form;
 
 
+    echo '
+        <label for="editable">Edit Fields: <input type="checkbox" id="editable"></label>
+ ';
 
     $table_rep = '<table> <thead><tr>';
     foreach ($columns as $column) :
         $table_rep .= '<th>' . $column[0] . '</th>';
     endforeach;
     $table_rep .= '</tr></thead>';
-
-
-
 
     if ($insert_to_parse) {
         require_once "./sqlparser/PHPSQLParser.php";
@@ -120,8 +123,29 @@ if ($current_table_name) {
 
         foreach ($parsed['VALUES'] as $value) :
             $table_rep .= '<tr>';
-            foreach ($value['data'] as $item) :
-                $table_rep .= '<td>' . str_replace("'", "", $item['base_expr']) . '</td>';
+            foreach ($value['data'] as $key => $item) :
+                $value =  str_replace("'", "", $item['base_expr']);
+
+                $table_rep .= '<td>';
+
+                $column_type =  $columns[$key][1];
+                $column =  generateTableType($column_type);
+
+                if ($column->field_name == 'select') {
+                    $table_rep .= '<select name="' . $columns[$key][1] . '" >
+                                <option ></option>';
+                    foreach ($column->options as $option) {
+                        $table_rep .= '<option value="' . $option . '"</option>';
+                    }
+                    $table_rep .= '</select>';
+                } else if ($column->field_name == 'number'){
+                    $table_rep .= '<input type="number" disabled name="' . $columns[$key][1] . '" value="'.$value. '"/>';
+                } else {
+                    $table_rep .= '<input type="text" disabled name="' . $columns[$key][1] . '" value="'.$value. '"/>';
+                }
+
+
+                $table_rep .= '</td>';
             endforeach;
             $table_rep .= '</tr>';
         endforeach;
@@ -130,4 +154,34 @@ if ($current_table_name) {
 
 
     echo $table_rep;
+}
+
+echo "<script>";
+include "index.js";
+echo "</script>";
+
+
+function generateTableType($column_type)
+{
+
+    $data  = new stdClass();
+    $data->field_name =  "";
+    if (str_contains($column_type, "enum")) {
+        $data->field_type = "select";
+        $options =  explode(",", $column_type);
+
+        for ($i = 0; $i < count($options); $i++) {
+            $options[$i] =  str_replace("enum", "", $options[$i]);
+            $options[$i] =  str_replace("(", "", $options[$i]);
+            $options[$i] =  str_replace(")", "", $options[$i]);
+            $options[$i] =  str_replace("'", "", $options[$i]);
+        }
+        $data->options = $options;
+    } else if (str_contains($column_type, "int")) {
+        $data->field_type = 'number';
+    } else if (str_contains($column_type, "text")) {
+        $data->field_type = 'textarea';
+    }
+
+    return $data;
 }
