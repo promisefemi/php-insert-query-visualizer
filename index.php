@@ -146,7 +146,7 @@ if ($current_table_name) {
                 $column =  generateTableType($column_type);
 
                 if ($column->field_name == 'select') {
-                    $table_rep .= '<select name="' . $columns[$key][0] . '.-.' . $columns[$key][2] . '[]" readonly>
+                    $table_rep .= '<select name="' . $columns[$key][0] . '_-_' . $column->field_name . '_-_' . $columns[$key][2] . '[]" readonly>
                                 <option value="" >Select</option>';
                     foreach ($column->options as $option) {
                         $table_rep .= '<option value="' . $option . '"';
@@ -155,19 +155,19 @@ if ($current_table_name) {
                     }
                     $table_rep .= '</select>';
                 } else if ($column->field_name == 'number') {
-                    $table_rep .= '<input type="number" readonly name="' . $columns[$key][0] . '.-.' . $columns[$key][2] . '[]" value="';
+                    $table_rep .= '<input type="number" readonly name="' .  $columns[$key][0] . '_-_' . $column->field_name . '_-_' . $columns[$key][2]  . '[]" value="';
                     if ($value != 'NULL') {
                         $table_rep .= $value;
                     }
                     $table_rep .= '"/>';
                 } else if ($column->field_name == 'textarea') {
-                    $table_rep .= '<textarea readonly name="' . $columns[$key][0] . '.-.' . $columns[$key][2] . '[]">';
+                    $table_rep .= '<textarea readonly name="' .  $columns[$key][0] . '_-_' . $column->field_name . '_-_' . $columns[$key][2] . '[]">';
                     if ($value != 'NULL') {
                         $table_rep .= $value;
                     }
                     $table_rep .= '</textarea>';
                 } else {
-                    $table_rep .= '<input type="text" readonly name="' . $columns[$key][0] . '.-.' . $columns[$key][2] . '[]" value="';
+                    $table_rep .= '<input type="text" readonly name="' .  $columns[$key][0] . '_-_' . $column->field_name . '_-_' . $columns[$key][2] . '[]" value="';
                     if ($value != 'NULL') {
                         $table_rep .= $value;
                     }
@@ -201,34 +201,46 @@ if (!empty($post_data) && isset($post_data['generate'])) {
     // echo "<pre/>";
     // print_r($post_data);
     // die();
+    echo "<pre/>";
 
 
     $columns =  array();
-    $new_insert_query = "INSERT INTO `" . $database . "." . $table_name . "` VALUES";
+    $new_insert_query = "INSERT INTO `" . $table_name . "` VALUES";
     foreach ($post_data as $column => $value) {
-        $column_fields =  explode('.-.', $column);
+        $column_fields =  explode('_-_', $column);
         $newColumn =  new stdClass();
 
+        $newColumn->full =  $column;
         $newColumn->name =  $column_fields[0];
-        $newColumn->nullable =  $column_fields[1];
+        $newColumn->type =  $column_fields[1];
+        $newColumn->nullable =  $column_fields[2];
         array_push($columns, $newColumn);
     }
-    $count = count($post_data[$columns[0]->name]);
+    // die();
+
+    $count = count($post_data[$columns[0]->full]);
     // echo $count . "<br/>";
+
+
+
     for ($i = 0; $i < $count; $i++) {
         $new_insert_query .= "(";
 
         foreach ($columns as $key => $column) {
-            if (isset($post_data[$column->name][$i])) {
+            if (isset($post_data[$column->full][$i])) {
 
-                if ($column->nullable == "YES" &&  $post_data[$column->name][$i] == '') {
-                    $new_insert_query .= NULL;
+                if ($column->nullable == "YES" &&  trim($post_data[$column->full][$i]) == '') {
+                    $new_insert_query .= "NULL";
+                } else if ($column->type == "select" && trim($post_data[$column->full][$i]) == '') {
+                    $new_insert_query .= "'0'";
                 } else {
-                    $new_insert_query .= "'" . $post_data[$column->name][$i] . "'";
+                    $new_insert_query .= "'" . $post_data[$column->full][$i] . "'";
                 }
             } else {
                 if ($column->nullable == "YES") {
-                    $new_insert_query .= NULL;
+                    $new_insert_query .= "NULL";
+                } else if ($column->type == "select") {
+                    $new_insert_query .= "'0'";
                 } else {
                     $new_insert_query .= "''";
                 }
