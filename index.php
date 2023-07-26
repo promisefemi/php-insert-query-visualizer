@@ -132,16 +132,32 @@ if ($current_table_name) {
                 $column =  generateTableType($column_type);
 
                 if ($column->field_name == 'select') {
-                    $table_rep .= '<select name="' . $columns[$key][1] . '" >
-                                <option ></option>';
+                    $table_rep .= '<select name="' . $columns[$key][0] . '[]" disabled>
+                                <option >Select</option>';
                     foreach ($column->options as $option) {
-                        $table_rep .= '<option value="' . $option . '"</option>';
+                        $table_rep .= '<option value="' . $option . '"';
+                        $table_rep .= $option == $value ? ' selected="selected"' : '';
+                        $table_rep .= '>' . $option . '</option>';
                     }
                     $table_rep .= '</select>';
-                } else if ($column->field_name == 'number'){
-                    $table_rep .= '<input type="number" disabled name="' . $columns[$key][1] . '" value="'.$value. '"/>';
+                } else if ($column->field_name == 'number') {
+                    $table_rep .= '<input type="number" disabled name="' . $columns[$key][0] . '[]" value="';
+                    if ($value != 'NULL') {
+                        $table_rep .= $value;
+                    }
+                    $table_rep .= '"/>';
+                } else if ($column->field_name == 'textarea') {
+                    $table_rep .= '<textarea disabled name="' . $columns[$key][0] . '[]">';
+                    if ($value != 'NULL') {
+                        $table_rep .= $value;
+                    }
+                    $table_rep .= '</textarea>';
                 } else {
-                    $table_rep .= '<input type="text" disabled name="' . $columns[$key][1] . '" value="'.$value. '"/>';
+                    $table_rep .= '<input type="text" disabled name="' . $columns[$key][0] . '[]" value="';
+                    if ($value != 'NULL') {
+                        $table_rep .= $value;
+                    }
+                    $table_rep .= '"/>';
                 }
 
 
@@ -167,7 +183,7 @@ function generateTableType($column_type)
     $data  = new stdClass();
     $data->field_name =  "";
     if (str_contains($column_type, "enum")) {
-        $data->field_type = "select";
+        $data->field_name = "select";
         $options =  explode(",", $column_type);
 
         for ($i = 0; $i < count($options); $i++) {
@@ -178,10 +194,12 @@ function generateTableType($column_type)
         }
         $data->options = $options;
     } else if (str_contains($column_type, "int")) {
-        $data->field_type = 'number';
+        $data->field_name = 'number';
     } else if (str_contains($column_type, "text")) {
-        $data->field_type = 'textarea';
+        $data->field_name = 'textarea';
     }
+
+    //print_r($data);
 
     return $data;
 }
