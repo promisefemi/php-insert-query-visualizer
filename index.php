@@ -241,6 +241,8 @@ if (!empty($post_data) && isset($post_data['generate'])) {
                     $new_insert_query .= "NULL";
                 } else if ($column->type == "select") {
                     $new_insert_query .= "'0'";
+                } else if ($column->name == 'created') {
+                    $new_insert_query .= "'" . date("Y-m-d H:i:s") . "'";
                 } else {
                     $new_insert_query .= "''";
                 }
