@@ -63,7 +63,7 @@ echo $form;
 
 
 if ($current_table_name) {
-    $get_table_column_query =  "SELECT COLUMN_NAME, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" . $current_table_name . "' and TABLE_SCHEMA = '" . $database . "'";
+    $get_table_column_query =  "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" . $current_table_name . "' and TABLE_SCHEMA = '" . $database . "'";
 
     // echo $get_table_column_query;
 
@@ -102,13 +102,27 @@ if ($current_table_name) {
         <label for="editable">Edit Fields: <input type="checkbox" id="editable"></label>
  ';
 
-    $table_rep = '<table> <thead><tr>';
-    foreach ($columns as $column) :
-        $table_rep .= '<th>' . $column[0] . '</th>';
-    endforeach;
-    $table_rep .= '</tr></thead>';
+
 
     if ($insert_to_parse) {
+        $table_rep = '
+        <form method="post">
+        <input type="hidden" name="generate" value="yes"/>
+        <input type="hidden" name="table_name"  value="';
+        $table_rep .= $current_table_name;
+        $table_rep .= '"/>';
+
+        $table_rep .= ' <textarea name="insert_query" placeholder="Insert Query" style="display:none">';
+        if ($insert_to_parse) {
+            $table_rep .=   $insert_to_parse;
+        }
+        $table_rep .= '</textarea>';
+
+        $table_rep .= '<table> <thead><tr>';
+        foreach ($columns as $column) :
+            $table_rep .= '<th>' . $column[0] . '</th>';
+        endforeach;
+        $table_rep .= '</tr></thead>';
         require_once "./sqlparser/PHPSQLParser.php";
 
         $parse =  new  PHPSQLParser($insert_to_parse);
@@ -132,8 +146,8 @@ if ($current_table_name) {
                 $column =  generateTableType($column_type);
 
                 if ($column->field_name == 'select') {
-                    $table_rep .= '<select name="' . $columns[$key][0] . '[]" disabled>
-                                <option >Select</option>';
+                    $table_rep .= '<select name="' . $columns[$key][0] . '.-.' . $columns[$key][2] . '[]" readonly>
+                                <option value="" >Select</option>';
                     foreach ($column->options as $option) {
                         $table_rep .= '<option value="' . $option . '"';
                         $table_rep .= $option == $value ? ' selected="selected"' : '';
@@ -141,19 +155,19 @@ if ($current_table_name) {
                     }
                     $table_rep .= '</select>';
                 } else if ($column->field_name == 'number') {
-                    $table_rep .= '<input type="number" disabled name="' . $columns[$key][0] . '[]" value="';
+                    $table_rep .= '<input type="number" readonly name="' . $columns[$key][0] . '.-.' . $columns[$key][2] . '[]" value="';
                     if ($value != 'NULL') {
                         $table_rep .= $value;
                     }
                     $table_rep .= '"/>';
                 } else if ($column->field_name == 'textarea') {
-                    $table_rep .= '<textarea disabled name="' . $columns[$key][0] . '[]">';
+                    $table_rep .= '<textarea readonly name="' . $columns[$key][0] . '.-.' . $columns[$key][2] . '[]">';
                     if ($value != 'NULL') {
                         $table_rep .= $value;
                     }
                     $table_rep .= '</textarea>';
                 } else {
-                    $table_rep .= '<input type="text" disabled name="' . $columns[$key][0] . '[]" value="';
+                    $table_rep .= '<input type="text" readonly name="' . $columns[$key][0] . '.-.' . $columns[$key][2] . '[]" value="';
                     if ($value != 'NULL') {
                         $table_rep .= $value;
                     }
@@ -165,12 +179,82 @@ if ($current_table_name) {
             endforeach;
             $table_rep .= '</tr>';
         endforeach;
-        $table_rep .= '</tbody>';
+        $table_rep .= '</tbody></table>
+        
+        <br>
+        <button >Generate new Query</button>
+        </form>';
+
+        echo $table_rep;
+    }
+}
+
+$post_data = $_POST;
+
+if (!empty($post_data) && isset($post_data['generate'])) {
+    unset($post_data['generate']);
+
+    $table_name = $post_data['table_name'];
+    unset($post_data['table_name']);
+    unset($post_data['insert_query']);
+
+    // echo "<pre/>";
+    // print_r($post_data);
+    // die();
+
+
+    $columns =  array();
+    $new_insert_query = "INSERT INTO `" . $database . "." . $table_name . "` VALUES";
+    foreach ($post_data as $column => $value) {
+        $column_fields =  explode('.-.', $column);
+        $newColumn =  new stdClass();
+
+        $newColumn->name =  $column_fields[0];
+        $newColumn->nullable =  $column_fields[1];
+        array_push($columns, $newColumn);
+    }
+    $count = count($post_data[$columns[0]->name]);
+    // echo $count . "<br/>";
+    for ($i = 0; $i < $count; $i++) {
+        $new_insert_query .= "(";
+
+        foreach ($columns as $key => $column) {
+            if (isset($post_data[$column->name][$i])) {
+
+                if ($column->nullable == "YES" &&  $post_data[$column->name][$i] == '') {
+                    $new_insert_query .= NULL;
+                } else {
+                    $new_insert_query .= "'" . $post_data[$column->name][$i] . "'";
+                }
+            } else {
+                if ($column->nullable == "YES") {
+                    $new_insert_query .= NULL;
+                } else {
+                    $new_insert_query .= "''";
+                }
+            }
+            if ($key + 1 < count($columns)) {
+                $new_insert_query .= ",";
+            }
+        }
+        $new_insert_query .= ")";
+
+        if ($i + 1 < $count) {
+            $new_insert_query .= ",";
+        } else {
+            $new_insert_query .= ";";
+        }
     }
 
 
-    echo $table_rep;
+    echo '<textarea id="" >' . $new_insert_query . '</textarea>';
 }
+
+
+
+
+
+
 
 echo "<script>";
 include "index.js";
